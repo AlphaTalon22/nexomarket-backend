@@ -1,4 +1,4 @@
-package cl.duoc.nexomarket.ms_pago;
+package cl.duoc.nexoramarket.ms_pagos;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
