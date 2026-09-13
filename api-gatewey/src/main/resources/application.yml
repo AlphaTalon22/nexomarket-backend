@@ -1,0 +1,54 @@
+server:
+  port: 8080 # Puerto unificado para el frontend
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      routes:
+        # Ruta para ms-carrito (puerto 8082)
+        - id: ms-carrito
+          uri: http://localhost:8082
+          predicates:
+            - Path=/carrito/**
+
+        # Ruta para ms-pagos (puerto 8084)
+        - id: ms-pagos
+          uri: http://localhost:8084
+          predicates:
+            - Path=/pagos/**
+
+        # Ruta para ms-productos (puerto 8081)
+        - id: ms-productos
+          uri: http://localhost:8081
+          predicates:
+            - Path=/productos/**
+
+        # Ruta para ms-pedidos ( puerto 8083)
+        - id: ms-pedidos
+          uri: http://localhost:8083
+          predicates:
+            - Path=/pedidos/**
+
+      # Configuracion global de CORS para permitir peticiones desde cualquier Frontend 
+      #(Angular, React, HTML puro)
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+
+# Configuracion de actuator para ver el estado del Gateway
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, routes
