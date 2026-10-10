@@ -1,0 +1,53 @@
+spring:
+  application:
+    name: ms-notificaciones
+  config:
+    # Credenciales reales de RabbitMQ (NO se sube a GitHub, ver .gitignore)
+    import: optional:classpath:application-secrets.properties
+  rabbitmq:
+    # Los dos nodos del clúster: si se pierde la conexión con uno, el cliente se reconecta al otro
+    addresses: ${RABBITMQ_ADDRESSES:localhost:5672,localhost:5673}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASS:guest}
+    listener:
+      simple:
+        acknowledge-mode: manual          # cada consumidor decide ACK / NACK explícitamente
+        prefetch: 1                       # un mensaje a la vez por consumidor
+        default-requeue-rejected: false   # una excepción no controlada NO reencola: va a la DLQ
+
+# =====================================================================
+# Topología RabbitMQ centralizada: TODOS los nombres viven aquí.
+# El código los lee desde MessagingProperties o con ${...} en @RabbitListener.
+# =====================================================================
+nexora:
+  messaging:
+    exchanges:
+      eventos: nexora.eventos.topic          # TOPIC: eventos de dominio (pedido.*, pago.*)
+      documentos: nexora.documentos.direct   # DIRECT: comandos de generación de documentos
+      dead-letter: nexora.dlx.direct         # DIRECT: Dead Letter Exchange compartido
+    retencion-dlq-ms: 86400000               # los mensajes en DLQ se conservan 24 h
+    max-mensajes-cola: 10000                 # tope de mensajes por cola principal
+    notificaciones:                          # Caso de uso 1: avisar al cliente
+      queue: nexora.notificaciones.q
+      dlq: nexora.notificaciones.dlq
+      dead-letter-routing-key: notificaciones.dead
+      binding-keys:
+        - "pedido.*"
+        - "pago.*"
+    boletas:                                 # Caso de uso 2: generar boleta del pago
+      queue: nexora.boletas.q
+      dlq: nexora.boletas.dlq
+      dead-letter-routing-key: boletas.dead
+      binding-keys:
+        - "boleta.generar"
+    dlq-monitor:
+      enabled: false                         # true = consumir y registrar en log lo que llega a las DLQ
+
+  notificaciones:
+    simular-fallo-correo: false              # true = simula caída del servidor de correo (demo de reintento + DLQ)
+  boletas:
+    directorio: ./boletas                    # carpeta donde se escriben las boletas generadas
+
+logging:
+  level:
+    cl.duoc.nexoramarket: INFO

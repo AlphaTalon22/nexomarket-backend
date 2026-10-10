@@ -46,6 +46,11 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
 		</dependency>
+		<!-- RabbitMQ (Spring AMQP): publica pedido.creado y consume los eventos de pago -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-amqp</artifactId>
+		</dependency>
 
 		<dependency>
 			<groupId>com.mysql</groupId>

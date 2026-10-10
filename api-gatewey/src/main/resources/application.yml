@@ -4,6 +4,19 @@ server:
 spring:
   application:
     name: api-gateway
+  config:
+    # Valores propios de cada despliegue (URL del frontend, IP de ms-rabbit-admin). NO se sube a GitHub.
+    import: optional:classpath:application-secrets.properties
+
+  # El Gateway (BFF) valida el JWT igual que el API Manager y los microservicios
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Emisor (tenant del IDaaS) y audiencia (Client ID de la API) que debe traer el token
+          issuer-uri: ${NEXORA_JWT_ISSUER_URI:https://login.microsoftonline.com/5f26903b-8f3c-4181-afbb-a40c0b6e034d/v2.0}
+          audiences: ${NEXORA_JWT_AUDIENCE:967df881-c709-4c72-9c7c-787c1aa5557d,api://967df881-c709-4c72-9c7c-787c1aa5557d}
+
   cloud:
     gateway:
       routes:
@@ -31,13 +44,21 @@ spring:
           predicates:
             - Path=/pedidos/**
 
-      # Configuracion global de CORS para permitir peticiones desde cualquier Frontend 
-      #(Angular, React, HTML puro)
+        # Ruta para ms-rabbit-admin (puerto 8085, corre en la EC2 de RabbitMQ)
+        # Reemplazar por la IP PRIVADA de esa EC2, ej: http://172.31.xx.xx:8085
+        - id: ms-rabbit-admin
+          uri: ${RABBIT_ADMIN_URI:http://localhost:8085}
+          predicates:
+            - Path=/rabbit-admin/**
+
+      # CORS: solo los orígenes conocidos del frontend pueden llamar al Gateway desde el navegador
       globalcors:
         add-to-simple-url-handler-mapping: true
         corsConfigurations:
           '[/**]':
-            allowedOrigins: "*"
+            allowedOrigins:
+              - http://localhost:4200                                   # Angular en desarrollo
+              - ${NEXORA_FRONTEND_URL:http://localhost:4200}            # Angular desplegado (https://xxxx.cloudfront.net)
             allowedMethods:
               - GET
               - POST

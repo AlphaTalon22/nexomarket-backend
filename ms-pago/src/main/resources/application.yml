@@ -1,0 +1,49 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: ms-pagos
+  config:
+    # Credenciales de la BD y de RabbitMQ (NO se sube a GitHub, ver .gitignore)
+    import: optional:classpath:application-secrets.properties
+
+  datasource:
+    url: jdbc:mysql://nexoramarket-db.cjwkbpbjiw3v.us-east-1.rds.amazonaws.com:3306/nexoramarket?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Santiago
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Emisor (tenant del IDaaS) y audiencia (Client ID de la API) que debe traer el token
+          issuer-uri: ${NEXORA_JWT_ISSUER_URI:https://login.microsoftonline.com/5f26903b-8f3c-4181-afbb-a40c0b6e034d/v2.0}
+          audiences: ${NEXORA_JWT_AUDIENCE:967df881-c709-4c72-9c7c-787c1aa5557d,api://967df881-c709-4c72-9c7c-787c1aa5557d}
+
+  rabbitmq:
+    addresses: ${RABBITMQ_ADDRESSES:localhost:5672,localhost:5673}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASS:guest}
+    connection-timeout: 3s               # si RabbitMQ no responde, no se bloquea la petición HTTP
+    publisher-confirm-type: correlated   # el broker confirma cada mensaje publicado
+    publisher-returns: true              # avisa si un mensaje no llegó a ninguna cola
+    template:
+      mandatory: true
+
+# =====================================================================
+# Topología RabbitMQ centralizada: TODOS los nombres viven aquí.
+# ms-pago solo PUBLICA, por eso declara exchanges y routing keys (no colas).
+# =====================================================================
+nexora:
+  messaging:
+    exchanges:
+      eventos: nexora.eventos.topic          # TOPIC: resultado del pago (pago.aprobado / pago.rechazado)
+      documentos: nexora.documentos.direct   # DIRECT: comando para generar la boleta
+    routing-keys:
+      pago-aprobado: pago.aprobado
+      pago-rechazado: pago.rechazado
+      boleta-generar: boleta.generar

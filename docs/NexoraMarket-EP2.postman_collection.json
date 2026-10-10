@@ -1,0 +1,981 @@
+{
+  "info": {
+    "_postman_id": "95ba0e19-0b1e-4307-8cb3-08b5f8f69b9d",
+    "name": "Nexora Market — EP2 (JWT + RabbitMQ)",
+    "description": "Pruebas de la EP2 de DSY1107. La autenticación OAuth 2.0 (Authorization Code + PKCE) está configurada a nivel de colección: en la pestaña Authorization de la colección presiona 'Get New Access Token' y luego 'Use Token'. Las variables se editan en la pestaña Variables de la colección.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "oauth2",
+    "oauth2": [
+      {
+        "key": "grant_type",
+        "value": "authorization_code_with_pkce",
+        "type": "string"
+      },
+      {
+        "key": "authUrl",
+        "value": "{{authUrl}}",
+        "type": "string"
+      },
+      {
+        "key": "accessTokenUrl",
+        "value": "{{tokenUrl}}",
+        "type": "string"
+      },
+      {
+        "key": "clientId",
+        "value": "{{clientId}}",
+        "type": "string"
+      },
+      {
+        "key": "scope",
+        "value": "{{scope}}",
+        "type": "string"
+      },
+      {
+        "key": "redirect_uri",
+        "value": "https://oauth.pstmn.io/v1/callback",
+        "type": "string"
+      },
+      {
+        "key": "challengeAlgorithm",
+        "value": "S256",
+        "type": "string"
+      },
+      {
+        "key": "client_authentication",
+        "value": "body",
+        "type": "string"
+      },
+      {
+        "key": "tokenName",
+        "value": "nexora-jwt",
+        "type": "string"
+      },
+      {
+        "key": "addTokenTo",
+        "value": "header",
+        "type": "string"
+      },
+      {
+        "key": "useBrowser",
+        "value": false,
+        "type": "boolean"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://<IP-ELASTICA-GATEWAY>:8080",
+      "description": "URL del Gateway (BFF) o del API Manager (https://xxxx.execute-api.us-east-1.amazonaws.com)"
+    },
+    {
+      "key": "authUrl",
+      "value": "https://login.microsoftonline.com/<TENANT_ID>/oauth2/v2.0/authorize",
+      "description": "External ID: https://<subdominio>.ciamlogin.com/<TENANT_ID>/oauth2/v2.0/authorize"
+    },
+    {
+      "key": "tokenUrl",
+      "value": "https://login.microsoftonline.com/<TENANT_ID>/oauth2/v2.0/token",
+      "description": "External ID: https://<subdominio>.ciamlogin.com/<TENANT_ID>/oauth2/v2.0/token"
+    },
+    {
+      "key": "clientId",
+      "value": "<CLIENT_ID_APP_CON_REDIRECT_DE_POSTMAN>"
+    },
+    {
+      "key": "scope",
+      "value": "api://<CLIENT_ID_API>/access_as_user openid profile offline_access"
+    },
+    {
+      "key": "pedidoId",
+      "value": "1"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Seguridad JWT (API Manager / BFF)",
+      "description": "Evidencia de que el API Manager y el BFF validan el JWT.",
+      "item": [
+        {
+          "name": "Sin token → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos"
+              ]
+            },
+            "description": "El Gateway rechaza la petición antes de enrutarla.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Token inválido → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos"
+              ]
+            },
+            "description": "Token alterado: el Gateway valida la firma y lo rechaza.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJmYWxzbyJ9.firma-invalida",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Con token válido → 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Devuelve un arreglo JSON', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Rutas del backend (JSON esperado)",
+      "description": "Cada ruta del Gateway llega a su microservicio y devuelve JSON.",
+      "item": [
+        {
+          "name": "GET /productos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Devuelve un arreglo JSON', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "GET /carrito",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Devuelve un arreglo JSON', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/carrito",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "carrito"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "GET /pedidos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Devuelve un arreglo JSON', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/pedidos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pedidos"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "GET /pagos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Devuelve un arreglo JSON', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/pagos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pagos"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Flujos asíncronos con RabbitMQ",
+      "description": "Productores en ms-pedidos y ms-pago; consumidores en ms-pedidos y ms-notificaciones.",
+      "item": [
+        {
+          "name": "Crear pedido → evento pedido.creado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "const p = pm.response.json(); pm.collectionVariables.set('pedidoId', p.id);",
+                  "pm.test('Devuelve el pedido creado con id', () => pm.expect(p.id).to.be.a('number'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pedidos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pedidos"
+              ]
+            },
+            "description": "Revisar en el log de ms-notificaciones: [NOTIFICACION] Recibimos tu pedido...",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clienteId\": 1,\n  \"total\": 450000,\n  \"estado\": \"PENDIENTE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Pagar pedido → pago.aprobado + boleta.generar",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Pago aprobado', () => pm.expect(pm.response.json().estado).to.eql('APROBADO'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pagos/procesar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pagos",
+                "procesar"
+              ]
+            },
+            "description": "ms-pedidos cambia el pedido a PAGADO; ms-notificaciones notifica y genera la boleta.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pedidoId\": {{pedidoId}},\n  \"monto\": 450000,\n  \"metodoPago\": \"DEBITO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Verificar pedido PAGADO",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// El pago se procesa de forma asíncrona: esperar 3 s antes de consultar el pedido",
+                  "setTimeout(() => {}, 3000);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('El pedido quedó PAGADO', () => pm.expect(pm.response.json().estado).to.eql('PAGADO'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/pedidos/{{pedidoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pedidos",
+                "{{pedidoId}}"
+              ]
+            },
+            "description": "Esperar 1-2 segundos después del pago (es asíncrono)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. DLQ: mensajes no procesables",
+      "description": "Para el caso de reintento + DLQ, iniciar ms-notificaciones con --nexora.notificaciones.simular-fallo-correo=true y crear un pedido.",
+      "item": [
+        {
+          "name": "Pago de pedido inexistente → DLQ",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pagos/procesar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pagos",
+                "procesar"
+              ]
+            },
+            "description": "ms-pedidos no encuentra el pedido 999999: NACK sin reencolar → nexora.pedidos.pagos.dlq (ver log [NACK -> DLQ] y el dashboard).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pedidoId\": 999999,\n  \"monto\": 1000,\n  \"metodoPago\": \"DEBITO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Administración de RabbitMQ (ms-rabbit-admin)",
+      "description": "Ejecutar en orden: crea, valida, consulta y elimina recursos de prueba.",
+      "item": [
+        {
+          "name": "Crear exchange TOPIC → 201",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/rabbit-admin/exchanges",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rabbit-admin",
+                "exchanges"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"nexora.demo.topic\",\n  \"tipo\": \"TOPIC\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Crear cola con DLX → 201",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/rabbit-admin/queues",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rabbit-admin",
+                "queues"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"nexora.demo.q\",\n  \"deadLetterExchange\": \"nexora.dlx.direct\",\n  \"deadLetterRoutingKey\": \"demo.dead\",\n  \"ttlMs\": 60000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Crear cola duplicada → 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/rabbit-admin/queues",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rabbit-admin",
+                "queues"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"nexora.demo.q\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Crear cola con nombre inválido → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/rabbit-admin/queues",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rabbit-admin",
+                "queues"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"amq.no permitido\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Crear exchange sin tipo → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/rabbit-admin/exchanges",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rabbit-admin",
+                "exchanges"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"nexora.demo.x\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Crear binding → 201",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/rabbit-admin/bindings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rabbit-admin",
+                "bindings"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cola\": \"nexora.demo.q\",\n  \"exchange\": \"nexora.demo.topic\",\n  \"routingKey\": \"demo.#\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Ver estado de la cola → 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/rabbit-admin/queues/nexora.demo.q",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rabbit-admin",
+                "queues",
+                "nexora.demo.q"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Eliminar binding → 204",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/rabbit-admin/bindings?cola=nexora.demo.q&exchange=nexora.demo.topic&routingKey=demo.%23",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rabbit-admin",
+                "bindings"
+              ],
+              "query": [
+                {
+                  "key": "cola",
+                  "value": "nexora.demo.q"
+                },
+                {
+                  "key": "exchange",
+                  "value": "nexora.demo.topic"
+                },
+                {
+                  "key": "routingKey",
+                  "value": "demo.%23"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Eliminar cola → 204",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/rabbit-admin/queues/nexora.demo.q",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rabbit-admin",
+                "queues",
+                "nexora.demo.q"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Eliminar cola inexistente → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/rabbit-admin/queues/nexora.demo.q",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rabbit-admin",
+                "queues",
+                "nexora.demo.q"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Eliminar exchange → 204",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/rabbit-admin/exchanges/nexora.demo.topic",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rabbit-admin",
+                "exchanges",
+                "nexora.demo.topic"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Admin sin token → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/rabbit-admin/queues",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "rabbit-admin",
+                "queues"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"nexora.x.q\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

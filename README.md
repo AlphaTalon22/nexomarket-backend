@@ -2,7 +2,9 @@
 
 Backend de microservicios para **Nexora Market**, proyecto desarrollado para el ramo **Desarrollo Cloud Native I (DSY1107)** de DUOC UC.
 
-El backend está compuesto por 4 microservicios de negocio y un API Gateway, desplegados en instancias EC2 independientes dentro de una misma VPC de AWS, con autenticación centralizada mediante **Azure Entra ID (OAuth2 / JWT)**.
+El backend está compuesto por 4 microservicios de negocio, un API Gateway (BFF), un consumidor de eventos (ms-notificaciones) y un administrador de RabbitMQ (ms-rabbit-admin), desplegados en instancias EC2 dentro de una misma VPC de AWS, con autenticación centralizada mediante **Azure Entra ID (OAuth2 / JWT)** y mensajería asíncrona con un **clúster RabbitMQ de 2 nodos**.
+
+> **EP2:** la guía completa de la entrega (RabbitMQ, ajustes EP1, despliegue y pruebas) está en [`docs/EP2-GUIA.md`](docs/EP2-GUIA.md).
 
 ## Arquitectura
 
@@ -38,6 +40,8 @@ Todas las instancias (gateway + 4 microservicios) viven en la misma VPC y compar
 | `ms-carrito` | 8082 | `/carrito/**` | Carrito de compras. |
 | `ms-pedidos` | 8083 | `/pedidos/**` | Gestión de pedidos. |
 | `ms-pago` | 8084 | `/pagos/**` | Procesamiento de pagos. |
+| `ms-rabbit-admin` | 8085 | `/rabbit-admin/**` | API REST para crear/eliminar colas, exchanges y bindings de RabbitMQ. |
+| `ms-notificaciones` | — | — (solo consume colas) | Notificaciones al cliente y generación de boletas a partir de eventos. |
 
 Cada microservicio corre en su propia instancia EC2 (Amazon Linux 2023, t3.micro), todas dentro de la misma VPC y Security Group (`nexora-microservicios-sg`), lo que permite que el Gateway les llegue por IP privada.
 
@@ -55,7 +59,7 @@ Cada microservicio corre en su propia instancia EC2 (Amazon Linux 2023, t3.micro
 
 ## Seguridad
 
-Todos los microservicios (incluido `ms-pago`) validan el token JWT emitido por Azure Entra ID mediante `spring-boot-starter-oauth2-resource-server`. La configuración base en cada servicio es:
+El API Gateway (BFF) y todos los microservicios validan el token JWT emitido por Azure Entra ID mediante `spring-boot-starter-oauth2-resource-server`. La configuración base en cada servicio es:
 
 ```properties
 spring.security.oauth2.resourceserver.jwt.issuer-uri=https://login.microsoftonline.com/<TENANT_ID>/v2.0
@@ -77,6 +81,19 @@ public class SecurityConfig {
 ```
 
 La API está registrada en Azure Entra ID como `NexoraMarket-API`, con el scope delegado `access_as_user` que el frontend (o cualquier cliente, como Postman) debe solicitar para obtener un token válido.
+
+## Mensajería asíncrona (RabbitMQ)
+
+| Exchange | Tipo | Routing key | Cola | Consumidor | DLQ |
+|---|---|---|---|---|---|
+| `nexora.eventos.topic` | topic | `pedido.*`, `pago.*` | `nexora.notificaciones.q` | ms-notificaciones | `nexora.notificaciones.dlq` |
+| `nexora.eventos.topic` | topic | `pago.*` | `nexora.pedidos.pagos.q` | ms-pedidos | `nexora.pedidos.pagos.dlq` |
+| `nexora.documentos.direct` | direct | `boleta.generar` | `nexora.boletas.q` | ms-notificaciones | `nexora.boletas.dlq` |
+
+- Productores: ms-pedidos (`pedido.creado`) y ms-pago (`pago.aprobado` / `pago.rechazado` / `boleta.generar`).
+- Nombres centralizados en `application.yml` (`nexora.messaging.*`), beans de Queue/Exchange/Binding en clases `@Configuration`.
+- Consumidores con `@RabbitListener` y ACK manual: ACK si todo sale bien, NACK a la DLQ si el mensaje es inválido, un reintento si el error es transitorio.
+- El clúster (docker compose) está en [`infra/rabbitmq-cluster`](infra/rabbitmq-cluster).
 
 ## Configuración de cada instancia
 
@@ -148,7 +165,11 @@ nexomarket-backend/
 ├── ms-productos/      # Microservicio de productos
 ├── ms-carrito/        # Microservicio de carrito
 ├── ms-pedidos/        # Microservicio de pedidos
-└── ms-pago/           # Microservicio de pagos
+├── ms-pago/           # Microservicio de pagos
+├── ms-notificaciones/ # Consumidor de eventos: notificaciones y boletas (RabbitMQ)
+├── ms-rabbit-admin/   # API REST de administración de RabbitMQ
+├── infra/rabbitmq-cluster/  # docker-compose del clúster RabbitMQ (2 nodos)
+└── docs/              # Guía EP2 y colección Postman
 ```
 
 ## Estado del proyecto
@@ -157,5 +178,9 @@ nexomarket-backend/
 - [x] API Gateway desplegado, enrutando por IP privada dentro de la VPC
 - [x] Seguridad JWT/Azure Entra ID en los 4 microservicios
 - [x] Pruebas end-to-end vía Postman (401 sin token / 200 con token) en las 4 rutas
-- [ ] Frontend Angular (en desarrollo, repositorio separado `nexomarket-frontend`)
-- [ ] Documentación EP2 y presentación final
+- [x] API Gateway (BFF) valida JWT (firma, emisor, audiencia, vigencia) antes de enrutar
+- [x] Mensajería RabbitMQ: 3 colas con DLQ, exchanges direct y topic, ACK manual
+- [x] ms-rabbit-admin: API REST validada para colas, exchanges y bindings
+- [x] Clúster RabbitMQ de 2 nodos con docker compose
+- [ ] Registro de usuarios con user flow (Entra External ID) — ver `docs/EP2-GUIA.md` §1.a
+- [ ] API Manager (AWS API Gateway) y frontend desplegado (S3 + CloudFront) — ver §1.d

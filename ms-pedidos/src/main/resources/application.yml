@@ -1,0 +1,60 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: ms-pedidos
+  config:
+    # Credenciales de la BD y de RabbitMQ (NO se sube a GitHub, ver .gitignore)
+    import: optional:classpath:application-secrets.properties
+
+  datasource:
+    url: jdbc:mysql://nexoramarket-db.cjwkbpbjiw3v.us-east-1.rds.amazonaws.com:3306/nexoramarket?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Santiago
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Emisor (tenant del IDaaS) y audiencia (Client ID de la API) que debe traer el token
+          issuer-uri: ${NEXORA_JWT_ISSUER_URI:https://login.microsoftonline.com/5f26903b-8f3c-4181-afbb-a40c0b6e034d/v2.0}
+          audiences: ${NEXORA_JWT_AUDIENCE:967df881-c709-4c72-9c7c-787c1aa5557d,api://967df881-c709-4c72-9c7c-787c1aa5557d}
+
+  rabbitmq:
+    # Los dos nodos del clúster: si se pierde la conexión con uno, el cliente se reconecta al otro
+    addresses: ${RABBITMQ_ADDRESSES:localhost:5672,localhost:5673}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASS:guest}
+    connection-timeout: 3s               # si RabbitMQ no responde, no se bloquea la petición HTTP
+    publisher-confirm-type: correlated   # el broker confirma cada mensaje publicado
+    publisher-returns: true              # avisa si un mensaje no llegó a ninguna cola
+    template:
+      mandatory: true
+    listener:
+      simple:
+        acknowledge-mode: manual          # el consumidor decide ACK / NACK explícitamente
+        prefetch: 1
+        default-requeue-rejected: false
+
+# =====================================================================
+# Topología RabbitMQ centralizada: TODOS los nombres viven aquí.
+# =====================================================================
+nexora:
+  messaging:
+    exchanges:
+      eventos: nexora.eventos.topic          # TOPIC donde se publican los eventos de dominio
+      dead-letter: nexora.dlx.direct         # Dead Letter Exchange compartido
+    routing-keys:
+      pedido-creado: pedido.creado           # lo publica este microservicio al crear un pedido
+    retencion-dlq-ms: 86400000               # los mensajes en DLQ se conservan 24 h
+    max-mensajes-cola: 10000
+    pagos:                                   # Caso de uso 3: actualizar el estado del pedido según el pago
+      queue: nexora.pedidos.pagos.q
+      dlq: nexora.pedidos.pagos.dlq
+      dead-letter-routing-key: pedidos-pagos.dead
+      binding-keys:
+        - "pago.*"

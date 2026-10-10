@@ -1,0 +1,77 @@
+# =====================================================================
+# Nexora Market — Clúster RabbitMQ de 2 nodos (EP2, DSY1107)
+#
+# Uso (en la EC2 "rabbitmq-server"):
+#   cp .env.example .env      # y cambiar las credenciales
+#   docker compose up -d
+#   docker compose ps
+#   docker exec rabbitmq-1 rabbitmqctl cluster_status
+#
+# Nodo 1: AMQP 5672  · Management UI 15672
+# Nodo 2: AMQP 5673  · Management UI 15673
+# =====================================================================
+services:
+  rabbitmq-1:
+    image: rabbitmq:4.2-management
+    container_name: rabbitmq-1
+    hostname: rabbitmq-1                 # el nodo se llama rabbit@rabbitmq-1
+    restart: unless-stopped              # vuelve solo cuando AWS Academy reinicia la EC2
+    environment:
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE}   # MISMO valor en ambos nodos
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+      # Con solo 2 nodos se desactiva Khepri (metadatos con Raft, que exige mayoría = los 2 nodos).
+      # Así, si se apaga el nodo 2, el nodo 1 sigue aceptando declaraciones de colas y exchanges.
+      # Solo tiene efecto al crear el nodo por primera vez (volúmenes vacíos).
+      RABBITMQ_FEATURE_FLAGS: "-khepri_db"
+    ports:
+      - "5672:5672"      # AMQP (microservicios)
+      - "15672:15672"    # Management UI
+    volumes:
+      - rabbitmq_data_1:/var/lib/rabbitmq
+      # Se monta en conf.d para NO pisar la configuración por defecto de la imagen
+      - ./rabbitmq-cluster.conf:/etc/rabbitmq/conf.d/30-cluster.conf:ro
+    networks:
+      - rabbitmq_cluster
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  rabbitmq-2:
+    image: rabbitmq:4.2-management
+    container_name: rabbitmq-2
+    hostname: rabbitmq-2                 # el nodo se llama rabbit@rabbitmq-2
+    restart: unless-stopped
+    environment:
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+      RABBITMQ_FEATURE_FLAGS: "-khepri_db"   # igual que el nodo 1
+    ports:
+      - "5673:5672"      # AMQP del nodo 2 expuesto en 5673 del host
+      - "15673:15672"    # Management UI del nodo 2
+    volumes:
+      - rabbitmq_data_2:/var/lib/rabbitmq
+      - ./rabbitmq-cluster.conf:/etc/rabbitmq/conf.d/30-cluster.conf:ro
+    networks:
+      - rabbitmq_cluster
+    depends_on:
+      rabbitmq-1:
+        condition: service_healthy       # el nodo 2 arranca cuando el nodo 1 ya responde
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  rabbitmq_data_1:
+  rabbitmq_data_2:
+
+networks:
+  rabbitmq_cluster:
+    driver: bridge

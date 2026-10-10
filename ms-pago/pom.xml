@@ -46,6 +46,11 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
 		</dependency>
+		<!-- RabbitMQ (Spring AMQP): publica pago.aprobado / pago.rechazado y el comando boleta.generar -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-amqp</artifactId>
+		</dependency>
 
 		<dependency>
 			<groupId>com.mysql</groupId>

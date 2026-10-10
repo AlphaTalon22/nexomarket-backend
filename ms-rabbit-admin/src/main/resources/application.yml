@@ -1,0 +1,20 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: ms-rabbit-admin
+  config:
+    # Credenciales reales de RabbitMQ (NO se sube a GitHub, ver .gitignore)
+    import: optional:classpath:application-secrets.properties
+  rabbitmq:
+    addresses: ${RABBITMQ_ADDRESSES:localhost:5672,localhost:5673}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASS:guest}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Emisor (tenant) y audiencia (Client ID de la API) que debe traer el token
+          issuer-uri: ${NEXORA_JWT_ISSUER_URI:https://login.microsoftonline.com/5f26903b-8f3c-4181-afbb-a40c0b6e034d/v2.0}
+          audiences: ${NEXORA_JWT_AUDIENCE:967df881-c709-4c72-9c7c-787c1aa5557d,api://967df881-c709-4c72-9c7c-787c1aa5557d}

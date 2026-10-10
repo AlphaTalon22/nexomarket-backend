@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import cl.duoc.nexoramarket.ms_pedidos.messaging.publisher.PedidoEventPublisher;
 import cl.duoc.nexoramarket.ms_pedidos.model.Pedido;
 import cl.duoc.nexoramarket.ms_pedidos.repository.PedidoRepository;
 import jakarta.validation.Valid;
@@ -25,6 +26,9 @@ public class PedidoController {
 
     @Autowired
     private PedidoRepository pedidoRepository;
+
+    @Autowired
+    private PedidoEventPublisher pedidoEventPublisher;
 
     @GetMapping
     public List<Pedido> listarTodos() {
@@ -42,6 +46,8 @@ public class PedidoController {
     public ResponseEntity<Pedido> crear(@Valid @RequestBody Pedido pedido) {
         pedido.setFecha(LocalDateTime.now());
         Pedido guardado = pedidoRepository.save(pedido);
+        // Evento asíncrono: notificaciones al cliente (no bloquea ni afecta la respuesta)
+        pedidoEventPublisher.publicarPedidoCreado(guardado);
         return ResponseEntity.status(HttpStatus.CREATED).body(guardado);
     }
 
