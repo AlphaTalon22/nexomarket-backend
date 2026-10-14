@@ -1,8 +1,7 @@
 {
   "info": {
-    "_postman_id": "95ba0e19-0b1e-4307-8cb3-08b5f8f69b9d",
-    "name": "Nexora Market — EP2 (JWT + RabbitMQ)",
-    "description": "Pruebas de la EP2 de DSY1107. La autenticación OAuth 2.0 (Authorization Code + PKCE) está configurada a nivel de colección: en la pestaña Authorization de la colección presiona 'Get New Access Token' y luego 'Use Token'. Las variables se editan en la pestaña Variables de la colección.",
+    "name": "Nexora EP2",
+    "description": "Pruebas EP2 DSY1107. Authorization de la coleccion: Get New Access Token y luego Use Token.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -68,26 +67,26 @@
   "variable": [
     {
       "key": "baseUrl",
-      "value": "http://<IP-ELASTICA-GATEWAY>:8080",
+      "value": "http://54.173.229.39:8080",
       "description": "URL del Gateway (BFF) o del API Manager (https://xxxx.execute-api.us-east-1.amazonaws.com)"
     },
     {
       "key": "authUrl",
-      "value": "https://login.microsoftonline.com/<TENANT_ID>/oauth2/v2.0/authorize",
+      "value": "https://login.microsoftonline.com/5f26903b-8f3c-4181-afbb-a40c0b6e034d/oauth2/v2.0/authorize",
       "description": "External ID: https://<subdominio>.ciamlogin.com/<TENANT_ID>/oauth2/v2.0/authorize"
     },
     {
       "key": "tokenUrl",
-      "value": "https://login.microsoftonline.com/<TENANT_ID>/oauth2/v2.0/token",
+      "value": "https://login.microsoftonline.com/5f26903b-8f3c-4181-afbb-a40c0b6e034d/oauth2/v2.0/token",
       "description": "External ID: https://<subdominio>.ciamlogin.com/<TENANT_ID>/oauth2/v2.0/token"
     },
     {
       "key": "clientId",
-      "value": "<CLIENT_ID_APP_CON_REDIRECT_DE_POSTMAN>"
+      "value": "f8d02b1a-9d14-4d7e-87c4-24bbf430721a"
     },
     {
       "key": "scope",
-      "value": "api://<CLIENT_ID_API>/access_as_user openid profile offline_access"
+      "value": "api://967df881-c709-4c72-9c7c-787c1aa5557d/access_as_user openid profile offline_access"
     },
     {
       "key": "pedidoId",
@@ -161,7 +160,7 @@
               "bearer": [
                 {
                   "key": "token",
-                  "value": "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJmYWxzbyJ9.firma-invalida",
+                  "value": "token-falso-para-probar-401",
                   "type": "string"
                 }
               ]
